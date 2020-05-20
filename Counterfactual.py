@@ -1,11 +1,14 @@
 import tensorflow as tf
+from sklearn.model_selection import train_test_split
+import numpy as np
 
 
 class Counterfactual():
-    def __init__(self, params, vocab):
+    def __init__(self, params, vocab, hate_w):
         for key in params:
             setattr(self, key, params[key])
         self.vocab = vocab
+        self.hate_weights = hate_w
 
     def build(self):
         tf.reset_default_graph()
@@ -28,6 +31,7 @@ class Counterfactual():
 
         self.y_hate = tf.placeholder(tf.int64, [None], name="hate_labels")
         self.weights = tf.placeholder(tf.float32, [None], name="weights")
+        self.drop_out =  tf.placeholder(tf.float32)
         embedding_W = tf.Variable(tf.constant(0.0,
                                               shape=[len(self.vocab), 300]),
                                   trainable=False, name="Embed")
@@ -53,13 +57,13 @@ class Counterfactual():
                                                          self.X_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.H = tf.concat(self.states, 1)
+        self.H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_out)
 
         _, self.counter_states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.cf_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.cf_H = tf.concat(self.states, 1)
+        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_out)
 
         X_logits = tf.layers.dense(self.H, 2, name="hate", reuse=True)
         cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
@@ -70,16 +74,70 @@ class Counterfactual():
             logits=X_logits,
             weights=logit_weights
         )
-        loss = tf.reduce_mean(xentropy)
-        loss += tf.reduce_mean(tf.abs(tf.subtract(X_logits, cf_logits)))
-        predicted = tf.argmax(X_logits, 1)
-        accuracy = tf.reduce_mean(
-            tf.cast(tf.equal(predicted, self.y_hate), tf.float32))
+        self.loss = tf.reduce_mean(xentropy)
+        self.loss += tf.reduce_mean(tf.abs(tf.subtract(X_logits, cf_logits)))
+        self.predicted = tf.argmax(X_logits, 1)
+        self.accuracy = tf.reduce_mean(
+            tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
+        self.oprimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate) \
+            .minimize(self.loss)
 
+    def feed_dict(self, batch, test=False, predict=False):
+        feed_dict = {
+            self.X: [t["input"] for t in batch],
+            self.cf: [t["counter"] for t in batch],
+            self.X_len: [t["length"] for t in batch],
+            self.keep_prob: 1 if test else self.drop_ratio,
+            self.embedding_placeholder: self.embeddings,
+            self.weights: self.hate_weights
+            }
+        if not predict:
+            feed_dict[self.y_hate] = [t["hate"] for t in batch]
+        return feed_dict
 
+    def train(self, batches):
+        init = tf.global_variables_initializer()
+        saver = tf.train.Saver()
+        with tf.Session() as self.sess:
+            init.run()
+            epoch = 1
+            while True:
+                train_loss, train_acc = 0, 0
+                test_acc = 0
+                train_idx, test_idx = train_test_split(np.arange(len(batches)),
+                                                       test_size=0.15, shuffle=True)
+                train_batches = [batches[i] for i in train_idx]
+                test_batches = [batches[i] for i in test_idx]
 
+                for batch in train_batches:
+                    _, loss, acc = self.sess.run(
+                        [self.oprimizer, self.loss, self.accuracy],
+                        feed_dict=self.feed_dict(batch))
+                    train_loss += loss
+                    train_acc += acc
 
-    def train(self):
+                for batch in test_batches:
+                    acc = self.sess.run(
+                        [self.accuracy],
+                        feed_dict=self.feed_dict(batch, True))
+                    test_acc += acc
 
+                print("Epoch: %d, loss: %.4f, train: %.4f, test: %.4f" %
+                          (epoch, train_loss / len(train_batches),
+                           train_acc / len(train_batches),
+                           test_acc / len(test_batches)))
+                epoch += 1
+                if epoch == self.epochs:
+                    saver.save(self.sess, "saved_model/counter")
+                    break
 
-    def predict(self):
+    def predict(self, batches):
+        saver = tf.train.Saver()
+        predicted = list()
+        with tf.Session() as self.sess:
+            saver.restore(self.sess, "saved_model/adversary/hate")
+            for batch in batches:
+                predicted.extend(list(self.sess.run(
+                    self.predicted,
+                    feed_dict=self.feed_dict(batch, True, True))))
+        return predicted
