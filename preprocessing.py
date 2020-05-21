@@ -69,7 +69,8 @@ class Preprocessing():
             result_path = os.path.join(self.result_dir, "Populated_" + filename)
             print("saving to", result_path)
             sgt_data_df.to_csv(result_path)
-
+        print(self.sgts)
+        print(self.found_sgts)
 
     def merge_preprocessed_chunks(directory):
         os.chdir(directory)
@@ -93,4 +94,25 @@ class Preprocessing():
         return perplexity
 
     def generate_counterfactuals(self, filename):
-        pass
+        # TODO: Comment the following line
+        self.found_sgts = ["muslim", "ali"]
+
+        dataset = pd.read_csv(filename)
+        rows_list = []
+        for index, row in tqdm(dataset.iterrows()):
+            text = row.text.lower()
+            current_sgts = row.sgts.split(",")
+
+            for from_sgt in current_sgts:
+                for to_sgt in self.found_sgts:
+                    if from_sgt != to_sgt:
+                        new_text = re.sub("((^|[^\w])(%s)([^\w]|$|s))" % from_sgt, to_sgt, text)
+                        row_dict = dict(row)
+                        row_dict["text"] = new_text
+                        row_dict["perplexity"] = self.get_perplexity(new_text)
+                        rows_list.append(row_dict)
+        sgt_data_df = pd.DataFrame(rows_list)
+        result_path = os.path.join(self.result_dir, "Counterfactuals.csv")
+        print("saving to", result_path)
+        sgt_data_df.to_csv(result_path)
+
