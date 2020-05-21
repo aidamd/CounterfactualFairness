@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from tqdm import tqdm
-from helpers import read_sgts
+from keras.preprocessing.sequence import pad_sequences
 import re
 import torch
 
@@ -79,19 +79,33 @@ class Preprocessing():
         combined_csv.to_csv("SGT-Gab.csv", index=False, encoding='utf-8-sig')
 
 
-    def get_perplexity(self, text):
-        token_ids = self.tokenizer.encode(text, add_special_tokens=True)
-        input_ids = torch.tensor(token_ids).unsqueeze(0)  # Batch size 1
+    def get_perplexity(self, sentences, MAX_LEN=128):
+        # TODO: discuss MAX_LEN with Aida
+        input_ids = []
+        for sen in sentences:
+            token_ids = self.tokenizer.encode(sen, add_special_tokens=True)
+            input_ids.append(token_ids)
+
+        input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long",
+                                  value=0, truncating="post", padding="post")
+        input_ids = torch.tensor(input_ids)
+
         outputs = self.model(input_ids)
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
-        perplexity = 0
-        for i in range(len(token_ids)):
-            index = token_ids[i]
-            probs = torch.nn.functional.softmax(last_hidden_states[0, i, :], dim=0)
-            prob = probs[index]
-            perplexity += torch.log(prob.data)
+        batch_size = last_hidden_states.shape[0]
+        perplexities = []
+        for k in range(len(sentences)):
+            perplexity = 0
+            for i in range(len(token_ids)):
+                index = token_ids[i]
+                probs = torch.nn.functional.softmax(last_hidden_states[k, i, :], dim=0)
+                prob = probs[index]
+                perplexity += torch.log(prob.data)
 
-        return perplexity
+            perplexities.append(perplexity)
+
+        return perplexities
+
 
     def generate_counterfactuals(self, filename):
         # TODO: Comment the following line
