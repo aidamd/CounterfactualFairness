@@ -69,3 +69,17 @@ class Preprocessing():
         all_filenames = [i for i in os.listdir()]
         combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames])
         combined_csv.to_csv("SGT-Gab.csv", index=False, encoding='utf-8-sig')
+
+    def get_perplexity(self, text):
+        token_ids = self.tokenizer.encode(text, add_special_tokens=True)
+        input_ids = torch.tensor(token_ids).unsqueeze(0)  # Batch size 1
+        outputs = self.model(input_ids)
+        last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
+        perplexity = 0
+        for i in range(len(token_ids)):
+            index = token_ids[i]
+            probs = torch.nn.functional.softmax(last_hidden_states[0, i, :], dim=0)
+            prob = probs[index]
+            perplexity += torch.log(prob.data)
+
+        return perplexity
