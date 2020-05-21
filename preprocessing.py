@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 from helpers import read_sgts
+import re
 
 
 class Preprocessing():
@@ -24,7 +25,8 @@ class Preprocessing():
             for index, row in tqdm(dataset.iterrows()):
                 text = row.text.lower()
                 for sgt in self.sgts:
-                    if sgt in text:
+                     if re.findall("((^|[^\w])(" + sgt + ")([^\w]|$))", text):
+                    #if sgt in text:
                         row_dict = dict(row)
                         row_dict["detected_sgt"] = sgt
                         rows_list.append(row_dict)
@@ -45,7 +47,8 @@ class Preprocessing():
             rows_list = []
             for index, row in tqdm(dataset.iterrows()):
                 text = row.text.lower()
-                present_sgts = [sgt for sgt in self.sgts if sgt in text]
+                present_sgts = [sgt for sgt in self.sgts if
+                                re.findall("((^|[^\w])(" + sgt + ")([^\w]|$))", text)]
                 present_sgts_str = ','.join(present_sgts)
                 row_dict = dict(row)
                 row_dict["sgts"] = present_sgts_str
