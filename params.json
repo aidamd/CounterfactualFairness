@@ -1,0 +1,9 @@
+{
+  "epochs": 15,
+  "h_size": 256,
+  "drop_rate": 0.5,
+  "vocab_size": 10000,
+  "embedding_size": 300,
+  "learning_rate": 0.001,
+  "batch_size": 128
+}

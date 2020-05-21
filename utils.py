@@ -4,6 +4,7 @@ import operator
 import re
 from sklearn.metrics import f1_score, precision_score, recall_score
 from collections import Counter
+import random
 
 def preprocess(df):
     print(df.shape[0], "datapoints in dataset")
@@ -13,7 +14,6 @@ def preprocess(df):
     return df
 
 def tokenize_data(corpus, col):
-    #sent_tokenizer = toks[self.params["tokenize"]]
     for idx, row in corpus.iterrows():
         corpus.at[idx, col] = nltk_token.WordPunctTokenizer().tokenize(clean(row[col]))
     return corpus
@@ -44,8 +44,8 @@ def learn_vocab(corpus, vocab_size):
 
 
 def tokens_to_ids(corpus, vocab):
-    print("Converting corpus of size %d to word indices based "
-          "on learned vocabulary" % len(corpus))
+    #print("Converting corpus of size %d to word indices based "
+    #      "on learned vocabulary" % len(corpus))
     if vocab is None:
         raise ValueError("learn_vocab before converting tokens")
 
@@ -76,28 +76,30 @@ def load_embedding(vocabulary, file_path, embedding_size):
           format(found, len(vocabulary)))
     return embeddings
 
-def get_batches(data, batch_size, pad_idx, hate=None):
+def get_batches(data, data_idx, batch_size, pad_idx, hate=None, counter=None):
     batches = []
     for idx in range(len(data) // batch_size + 1):
         if idx * batch_size !=  len(data):
             data_batch = data[idx * batch_size: min((idx + 1) * batch_size, len(data))]
+            idx_batch = data_idx[idx * batch_size: min((idx + 1) * batch_size, len(data))]
             hate_batch = hate[idx * batch_size: min((idx + 1) * batch_size, len(hate))] \
                 if hate else None
 
-            data_info = batch_to_info(data_batch, hate_batch, pad_idx)
+            data_info = batch_to_info(data_batch, hate_batch, idx_batch, pad_idx, counter)
             batches.append(data_info)
     return batches
 
-def batch_to_info(batch, hate, pad_idx):
+def batch_to_info(batch, hate, idx, pad_idx, cf):
     max_len = max(len(sent) for sent in batch)
     batch_info = list()
     for i, sent in enumerate(batch):
         padding = [pad_idx] * (max_len - len(sent))
         sentence = {
             "input": sent + padding,
-            "counter": sent + padding,
+            "counter": [sent + padding] if idx[i] not in cf else
+                        [c + padding for c in cf[idx[i]]],
             "length": len(sent),
-            "hate": hate[i] if hate else None
+            "hate": hate[i] if hate else None,
         }
         batch_info.append(sentence)
     return batch_info
@@ -110,3 +112,4 @@ def prediction_results(df, pred, label="hate"):
           )
     print(Counter(y))
     print(Counter(pred))
+

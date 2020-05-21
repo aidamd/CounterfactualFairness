@@ -1,6 +1,7 @@
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 import numpy as np
+from utils import *
 
 
 class Counterfactual():
@@ -8,11 +9,13 @@ class Counterfactual():
         for key in params:
             setattr(self, key, params[key])
         self.vocab = vocab
+        self.embeddings = load_embedding(self.vocab,
+                                         "Data/humility_embeddings.txt",
+                                         300)
         self.hate_weights = hate_w
 
     def build(self):
         tf.reset_default_graph()
-        self.keep_prob = tf.placeholder(tf.float32)
         self.X = tf.placeholder(tf.int32,
                                 [None, None],
                                 name="inputs")
@@ -31,7 +34,7 @@ class Counterfactual():
 
         self.y_hate = tf.placeholder(tf.int64, [None], name="hate_labels")
         self.weights = tf.placeholder(tf.float32, [None], name="weights")
-        self.drop_out =  tf.placeholder(tf.float32)
+        self.drop_ratio =  tf.placeholder(tf.float32, name="drop")
         embedding_W = tf.Variable(tf.constant(0.0,
                                               shape=[len(self.vocab), 300]),
                                   trainable=False, name="Embed")
@@ -57,15 +60,15 @@ class Counterfactual():
                                                          self.X_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_out)
+        self.H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_ratio)
 
         _, self.counter_states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.cf_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_out)
+        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_ratio)
 
-        X_logits = tf.layers.dense(self.H, 2, name="hate", reuse=True)
+        X_logits = tf.layers.dense(self.H, 2, name="hate")
         cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
         logit_weights = tf.gather(self.weights, self.y_hate)
 
@@ -84,15 +87,15 @@ class Counterfactual():
 
     def feed_dict(self, batch, test=False, predict=False):
         feed_dict = {
-            self.X: [t["input"] for t in batch],
-            self.cf: [t["counter"] for t in batch],
-            self.X_len: [t["length"] for t in batch],
-            self.keep_prob: 1 if test else self.drop_ratio,
+            self.X: np.array([t["input"] for t in batch]),
+            self.cf: np.array([t["counter"][0] for t in batch]),
+            self.X_len: np.array([t["length"] for t in batch]),
+            self.drop_ratio: 1 if test else self.drop_rate,
             self.embedding_placeholder: self.embeddings,
-            self.weights: self.hate_weights
+            self.weights: np.array(self.hate_weights)
             }
         if not predict:
-            feed_dict[self.y_hate] = [t["hate"] for t in batch]
+            feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict
 
     def train(self, batches):
@@ -110,6 +113,7 @@ class Counterfactual():
                 test_batches = [batches[i] for i in test_idx]
 
                 for batch in train_batches:
+                    self.feed_dict(batch)
                     _, loss, acc = self.sess.run(
                         [self.oprimizer, self.loss, self.accuracy],
                         feed_dict=self.feed_dict(batch))
@@ -117,8 +121,7 @@ class Counterfactual():
                     train_acc += acc
 
                 for batch in test_batches:
-                    acc = self.sess.run(
-                        [self.accuracy],
+                    acc = self.accuracy.eval(
                         feed_dict=self.feed_dict(batch, True))
                     test_acc += acc
 
