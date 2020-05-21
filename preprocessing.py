@@ -25,7 +25,7 @@ class Preprocessing():
             for index, row in tqdm(dataset.iterrows()):
                 text = row.text.lower()
                 for sgt in self.sgts:
-                     if re.findall("((^|[^\w])(" + sgt + ")([^\w]|$|s))", text):
+                     if re.findall("((^|[^\w])(" + sgt + ")([^\w]|$|s|es))", text):
                     #if sgt in text:
                         row_dict = dict(row)
                         row_dict["detected_sgt"] = sgt
@@ -48,7 +48,7 @@ class Preprocessing():
             for index, row in tqdm(dataset.iterrows()):
                 text = row.text.lower()
                 present_sgts = [sgt for sgt in self.sgts if
-                                re.findall("((^|[^\w])(" + sgt + ")([^\w]|$|s))", text)]
+                                re.findall("((^|[^\w])(" + sgt + ")([^\w]|$|s|es))", text)]
                 present_sgts_str = ','.join(present_sgts)
                 row_dict = dict(row)
                 row_dict["sgts"] = present_sgts_str
