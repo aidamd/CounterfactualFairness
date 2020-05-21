@@ -3,6 +3,7 @@ import pandas as pd
 from tqdm import tqdm
 from helpers import read_sgts
 import re
+import torch
 
 
 class Preprocessing():
