@@ -109,24 +109,30 @@ class Preprocessing():
 
     def generate_counterfactuals(self, filename):
         # TODO: Comment the following line
-        # TODO: Change to work over batches (a convenient choice is using all sgt-substitued texts for each record as a batch)
+        # TODO: Batch size choice: (a convenient choice is using all sgt-substitued texts for each record as a batch)
 
-        self.found_sgts = ["muslim", "ali"]
+        self.found_sgts = self.sgts
 
         dataset = pd.read_csv(filename)
         rows_list = []
         for index, row in tqdm(dataset.iterrows()):
             text = row.text.lower()
             current_sgts = row.sgts.split(",")
-
+            temp_row_list = []
+            sentences = []
             for from_sgt in current_sgts:
                 for to_sgt in self.found_sgts:
                     if from_sgt != to_sgt:
                         new_text = re.sub("((^|[^\w])(%s)([^\w]|$|s))" % from_sgt, to_sgt, text)
-                        row_dict = dict(row)
-                        row_dict["text"] = new_text
-                        row_dict["perplexity"] = self.get_perplexity(new_text)
-                        rows_list.append(row_dict)
+                        sentences.append(new_text)
+
+            perplexities = self.get_perplexity(sentences)
+            for i in range(len(perplexities)):
+                row_dict = dict(row)
+                row_dict["text"] = sentences[i]
+                row_dict["perplexity"] = perplexities[i].item()
+                rows_list.append(row_dict)
+
         sgt_data_df = pd.DataFrame(rows_list)
         result_path = os.path.join(self.result_dir, "Counterfactuals.csv")
         print("saving to", result_path)
