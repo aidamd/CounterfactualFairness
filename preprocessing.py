@@ -10,8 +10,13 @@ class Preprocessing():
     def __init__(self, predict_dir, sgt_path, result_dir):
         self.predict_dir = predict_dir
         self.sgt_file_path = sgt_path
-        self.sgts = read_sgts(sgt_path)
+        with open(sgt_path) as f:
+            content = f.readlines()
+            self.sgts = [item.replace("\n", "") for item in content]
         self.result_dir = result_dir
+        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'gpt2')
+        self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelWithLMHead', 'gpt2')
+
 
     def extract_posts_with_sgt(self):
 
