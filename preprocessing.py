@@ -69,8 +69,7 @@ class Preprocessing():
             result_path = os.path.join(self.result_dir, "Populated_" + filename)
             print("saving to", result_path)
             sgt_data_df.to_csv(result_path)
-        print(self.sgts)
-        print(self.found_sgts)
+
 
     def merge_preprocessed_chunks(directory):
         os.chdir(directory)
@@ -92,3 +91,6 @@ class Preprocessing():
             perplexity += torch.log(prob.data)
 
         return perplexity
+
+    def generate_counterfactuals(self, filename):
+        pass
