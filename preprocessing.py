@@ -109,6 +109,8 @@ class Preprocessing():
 
     def generate_counterfactuals(self, filename):
         # TODO: Comment the following line
+        # TODO: Change to work over batches (a convenient choice is using all sgt-substitued texts for each record as a batch)
+
         self.found_sgts = ["muslim", "ali"]
 
         dataset = pd.read_csv(filename)
