@@ -17,6 +17,7 @@ class Preprocessing():
         self.result_dir = result_dir
         self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', 'gpt2')
         self.model = torch.hub.load('huggingface/pytorch-transformers', 'modelWithLMHead', 'gpt2')
+        self.found_sgts = []
 
     def extract_posts_with_sgt(self):
 
@@ -54,6 +55,11 @@ class Preprocessing():
                 text = row.text.lower()
                 present_sgts = [sgt for sgt in self.sgts if
                                 re.findall("((^|[^\w])(" + sgt + ")([^\w]|$|s))", text)]
+
+                for sgt in present_sgts:
+                    if sgt not in self.found_sgts:
+                        self.found_sgts.append(sgt)
+
                 present_sgts_str = ','.join(present_sgts)
                 row_dict = dict(row)
                 row_dict["sgts"] = present_sgts_str
@@ -63,12 +69,15 @@ class Preprocessing():
             result_path = os.path.join(self.result_dir, "Populated_" + filename)
             print("saving to", result_path)
             sgt_data_df.to_csv(result_path)
+        print(self.sgts)
+        print(self.found_sgts)
 
     def merge_preprocessed_chunks(directory):
         os.chdir(directory)
         all_filenames = [i for i in os.listdir()]
         combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames])
         combined_csv.to_csv("SGT-Gab.csv", index=False, encoding='utf-8-sig')
+
 
     def get_perplexity(self, text):
         token_ids = self.tokenizer.encode(text, add_special_tokens=True)
