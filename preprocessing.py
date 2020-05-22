@@ -69,8 +69,6 @@ class Preprocessing():
             result_path = os.path.join(self.result_dir, "Populated_" + filename)
             print("saving to", result_path)
             sgt_data_df.to_csv(result_path)
-        print(self.sgts)
-        print(self.found_sgts)
 
     def merge_preprocessed_chunks(directory):
         os.chdir(directory)
@@ -94,10 +92,11 @@ class Preprocessing():
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
         batch_size = last_hidden_states.shape[0]
         perplexities = []
+        # print("shape of last hid", last_hidden_states.shape)
         for k in range(len(sentences)):
             perplexity = 0
-            for i in range(len(token_ids)):
-                index = token_ids[i]
+            for i in range(MAX_LEN):
+                index = input_ids[k][i].item()
                 probs = torch.nn.functional.softmax(last_hidden_states[k, i, :], dim=0)
                 prob = probs[index]
                 perplexity += torch.log(prob.data)
@@ -109,9 +108,9 @@ class Preprocessing():
 
     def generate_counterfactuals(self, filename):
         # TODO: Comment the following line
-        # TODO: Batch size choice: (a convenient choice is using all sgt-substitued texts for each record as a batch)
+        # TODO: Change to work over batches (a convenient choice is using all sgt-substitued texts for each record as a batch)
 
-        self.found_sgts = self.sgts
+        # self.found_sgts = self.sgts
 
         dataset = pd.read_csv(filename)
         rows_list = []
@@ -134,7 +133,16 @@ class Preprocessing():
                 rows_list.append(row_dict)
 
         sgt_data_df = pd.DataFrame(rows_list)
-        result_path = os.path.join(self.result_dir, "Counterfactuals.csv")
-        print("saving to", result_path)
+        result_path = os.path.join(self.result_dir, "Counterfactuals_" + filename.split("/")[-1])
+        print("saving counterfactuals to", result_path)
         sgt_data_df.to_csv(result_path)
 
+    def chunk(self, filepath, num_of_rows_per_chunk=2000):
+        filename = filepath.split("/")[-1]
+        dataset = pd.read_csv(filepath)
+        list_df = [dataset[i:i + num_of_rows_per_chunk] for i in range(0, dataset.shape[0], num_of_rows_per_chunk)]
+        for i in range(len(list_df)):
+            result_path = "results/Chunk_" + str(i) + "_" + filename
+            #print("saving to", result_path)
+            list_df[i].to_csv(result_path)
+        return len(list_df)
