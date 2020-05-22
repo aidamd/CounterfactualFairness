@@ -77,31 +77,37 @@ class Preprocessing():
         combined_csv.to_csv("SGT-Gab.csv", index=False, encoding='utf-8-sig')
 
 
-    def get_perplexity(self, sentences, MAX_LEN=128):
+    def get_perplexity(self, all_sentences, MAX_LEN=128, batch_size=128):
         # TODO: discuss MAX_LEN with Aida
-        input_ids = []
-        for sen in sentences:
-            token_ids = self.tokenizer.encode(sen, add_special_tokens=True)
-            input_ids.append(token_ids)
-
-        input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long",
-                                  value=0, truncating="post", padding="post")
-        input_ids = torch.tensor(input_ids)
-
-        outputs = self.model(input_ids)
-        last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
-        batch_size = last_hidden_states.shape[0]
         perplexities = []
-        # print("shape of last hid", last_hidden_states.shape)
-        for k in range(len(sentences)):
-            perplexity = 0
-            for i in range(MAX_LEN):
-                index = input_ids[k][i].item()
-                probs = torch.nn.functional.softmax(last_hidden_states[k, i, :], dim=0)
-                prob = probs[index]
-                perplexity += torch.log(prob.data)
 
-            perplexities.append(perplexity)
+        for w in range(0, len(all_sentences), batch_size):
+
+            sentences = all_sentences[w:w + batch_size]
+            input_ids = []
+
+            for sen in sentences:
+                token_ids = self.tokenizer.encode(sen, add_special_tokens=True)
+                input_ids.append(token_ids)
+
+            input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long",
+                                      value=0, truncating="post", padding="post")
+            input_ids = torch.tensor(input_ids)
+
+            outputs = self.model(input_ids)
+            last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
+            batch_size = last_hidden_states.shape[0]
+
+            # print("shape of last hid", last_hidden_states.shape)
+            for k in range(len(sentences)):
+                perplexity = 0
+                for i in range(MAX_LEN):
+                    index = input_ids[k][i].item()
+                    probs = torch.nn.functional.softmax(last_hidden_states[k, i, :], dim=0)
+                    prob = probs[index]
+                    perplexity += torch.log(prob.data)
+
+                perplexities.append(perplexity)
 
         return perplexities
 
