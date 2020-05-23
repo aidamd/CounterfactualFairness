@@ -70,24 +70,30 @@ class Preprocessing():
             print("saving to", result_path)
             sgt_data_df.to_csv(result_path)
 
-    def merge_preprocessed_chunks(directory):
+    def merge_preprocessed_chunks(self, directory):
         os.chdir(directory)
         all_filenames = [i for i in os.listdir()]
         combined_csv = pd.concat([pd.read_csv(f) for f in all_filenames])
         combined_csv.to_csv("SGT-Gab.csv", index=False, encoding='utf-8-sig')
 
 
-    def get_perplexity(self, all_sentences, MAX_LEN=128, batch_size=128):
+    def get_perplexity(self, all_sentences, MAX_LEN=128, chosen_batch_size=64):
         # TODO: discuss MAX_LEN with Aida
         perplexities = []
 
-        for w in range(0, len(all_sentences), batch_size):
-
-            sentences = all_sentences[w:w + batch_size]
+        for w in range(0, len(all_sentences), chosen_batch_size):
             input_ids = []
 
+            sentences = all_sentences[w:w + chosen_batch_size]
+
             for sen in sentences:
+                # print("original")
+                # print(sen.split(" "))
+                # print(print(len(sen.split(" "))))
                 token_ids = self.tokenizer.encode(sen, add_special_tokens=True)
+                # print("tokenized decode")
+                # print(self.tokenizer.decode(token_ids))
+                # print(len(token_ids))
                 input_ids.append(token_ids)
 
             input_ids = pad_sequences(input_ids, maxlen=MAX_LEN, dtype="long",
@@ -128,7 +134,10 @@ class Preprocessing():
             for from_sgt in current_sgts:
                 for to_sgt in self.found_sgts:
                     if from_sgt != to_sgt:
-                        new_text = re.sub("((^|[^\w])(%s)([^\w]|$|s))" % from_sgt, to_sgt, text)
+                        new_text = re.sub("((^|[^\w])(%s)([^\w]|$|s))" % from_sgt, " "+to_sgt+" ", text)
+                        # print(from_sgt)
+                        # print(to_sgt)
+                        # print(new_text)
                         sentences.append(new_text)
 
             perplexities = self.get_perplexity(sentences)
