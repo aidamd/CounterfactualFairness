@@ -1,5 +1,5 @@
 import tensorflow as tf
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 from utils import *
 
@@ -10,7 +10,7 @@ class Counterfactual():
             setattr(self, key, params[key])
         self.vocab = vocab
         self.embeddings = load_embedding(self.vocab,
-                                         "Data/humility_embeddings.txt",
+                                         "/home/aida/Data/word_embeddings/GloVe/glove.840B.300d.txt",
                                          300)
         self.hate_weights = hate_w
 
@@ -60,13 +60,13 @@ class Counterfactual():
                                                          self.X_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_ratio)
+        self.H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
 
         _, self.counter_states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.cf_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), rate=self.drop_ratio)
+        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
 
         X_logits = tf.layers.dense(self.H, 2, name="hate")
         cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
@@ -86,31 +86,31 @@ class Counterfactual():
             .minimize(self.loss)
 
     def feed_dict(self, batch, test=False, predict=False):
-        feed_dict = {
-            self.X: np.array([t["input"] for t in batch]),
-            self.cf: np.array([t["counter"][0] for t in batch]),
-            self.X_len: np.array([t["length"] for t in batch]),
-            self.drop_ratio: 1 if test else self.drop_rate,
-            self.embedding_placeholder: self.embeddings,
-            self.weights: np.array(self.hate_weights)
-            }
+        try:
+            feed_dict = {
+                self.X: np.array([t["input"] for t in batch]),
+                self.cf: np.vstack([t["counter"][0] for t in batch]),
+                self.X_len: np.array([t["length"] for t in batch]),
+                self.drop_ratio: 1 if test else self.drop_rate,
+                self.embedding_placeholder: self.embeddings,
+                self.weights: np.array(self.hate_weights)
+                }
+        except Exception:
+            print([len(t["counter"][0]) for t in batch])
         if not predict:
             feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict
 
-    def train(self, batches):
+    def train(self, train_batches, val_batches):
         init = tf.global_variables_initializer()
         saver = tf.train.Saver()
+
         with tf.Session() as self.sess:
             init.run()
             epoch = 1
             while True:
                 train_loss, train_acc = 0, 0
-                test_acc = 0
-                train_idx, test_idx = train_test_split(np.arange(len(batches)),
-                                                       test_size=0.15, shuffle=True)
-                train_batches = [batches[i] for i in train_idx]
-                test_batches = [batches[i] for i in test_idx]
+                val_acc = 0
 
                 for batch in train_batches:
                     self.feed_dict(batch)
@@ -120,25 +120,26 @@ class Counterfactual():
                     train_loss += loss
                     train_acc += acc
 
-                for batch in test_batches:
-                    acc = self.accuracy.eval(
+                for batch in val_batches:
+                    acc, pred = self.sess.run([self.accuracy, self.predicted],
                         feed_dict=self.feed_dict(batch, True))
-                    test_acc += acc
+                    val_acc += acc
 
                 print("Epoch: %d, loss: %.4f, train: %.4f, test: %.4f" %
                           (epoch, train_loss / len(train_batches),
                            train_acc / len(train_batches),
-                           test_acc / len(test_batches)))
+                           val_acc / len(val_batches)))
                 epoch += 1
                 if epoch == self.epochs:
                     saver.save(self.sess, "saved_model/counter")
                     break
 
+
     def predict(self, batches):
         saver = tf.train.Saver()
         predicted = list()
         with tf.Session() as self.sess:
-            saver.restore(self.sess, "saved_model/adversary/hate")
+            saver.restore(self.sess, "saved_model/counter")
             for batch in batches:
                 predicted.extend(list(self.sess.run(
                     self.predicted,

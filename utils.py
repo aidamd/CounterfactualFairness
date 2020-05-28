@@ -76,7 +76,7 @@ def load_embedding(vocabulary, file_path, embedding_size):
           format(found, len(vocabulary)))
     return embeddings
 
-def get_batches(data, data_idx, batch_size, pad_idx, hate=None, counter=None):
+def get_batches(data, data_idx, batch_size, pad_idx, counter=[], hate=None):
     batches = []
     for idx in range(len(data) // batch_size + 1):
         if idx * batch_size !=  len(data):
@@ -94,22 +94,23 @@ def batch_to_info(batch, hate, idx, pad_idx, cf):
     batch_info = list()
     for i, sent in enumerate(batch):
         padding = [pad_idx] * (max_len - len(sent))
+        if idx[i] in cf:
+            cf_paddings = [[pad_idx] * (max_len - len(c)) for c in cf[idx[i]]]
         sentence = {
             "input": sent + padding,
             "counter": [sent + padding] if idx[i] not in cf else
-                        [c + padding for c in cf[idx[i]]],
+            [(c + cf_paddings[x])[:max_len] for x, c in enumerate(cf[idx[i]])],
             "length": len(sent),
             "hate": hate[i] if hate else None,
         }
         batch_info.append(sentence)
     return batch_info
 
-def prediction_results(df, pred, label="hate"):
-    y = df[label].values.tolist()
-    print(": F1 score:", f1_score(y, pred),
-          ", Precision:", precision_score(y, pred),
-          ", Recall:", recall_score(y, pred)
-          )
-    print(Counter(y))
-    print(Counter(pred))
+def prediction_results(y, pred, label="hate"):
+    results = {"F1 score:": f1_score(y, pred),
+            "Precision:": precision_score(y, pred),
+            "Recall:": recall_score(y, pred)
+                }
+    print(results)
+    return results
 
