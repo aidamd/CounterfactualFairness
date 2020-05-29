@@ -50,8 +50,7 @@ class Counterfactual():
                                                    self.vocab,
                                                    )
 
-        self.hate_weights = [1 - (Counter(self.train["labels"])[i] /
-                                  len(self.train["labels"])) for i in [0, 1]]
+        self.hate_weights = [1, 5]
 
 
     def asymmetrics(self, tweet, counters, perplex, hate):
