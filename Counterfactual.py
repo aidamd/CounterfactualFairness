@@ -6,7 +6,6 @@ from utils import *
 
 class Counterfactual():
     def __init__(self, params, train, test, counter, asym=True):
-                 #vocab, hate_w):
         for key in params:
             setattr(self, key, params[key])
         self.asym = asym
@@ -44,9 +43,10 @@ class Counterfactual():
         self.counter = dict()
         for name, group in counter.groupby(["Tweet ID"]):
             if name in self.train["perplex"]:
-                self.counter[name] = tokens_to_ids(self.asymmetrics(name, group,
-                                                    self.train["perplex"][name],
-                                                    self.train["labels"][self.train["ids"].index[name]]),
+                counter = self.asymmetrics(name, group,
+                                           self.train["perplex"][name],
+                                           self.train["labels"][self.train["ids"].index(name)])
+                self.counter[name] = tokens_to_ids(counter.reset_index()["text"],
                                                    self.vocab,
                                                    )
 
@@ -60,7 +60,7 @@ class Counterfactual():
                      for i in range(counters.shape[0])]
             diffs.sort()
             thresh = np.argmax([diffs[i + 1] - diffs[i] for i in range(len(diffs) - 1)])
-            return counters.loc[[i for i in range(counters.shape[0]) if
+            return counters.iloc[[i for i in range(counters.shape[0]) if
                                  abs(perplex - counters["perplexity"].tolist()[i]) <= diffs[thresh]]]
         else:
             return [] if hate else counters
