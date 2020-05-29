@@ -11,7 +11,6 @@ class Counterfactual():
             setattr(self, key, params[key])
         self.preprocess(train, test, counter)
         self.embeddings = load_embedding(self.vocab,
-                                         "Data/humility_embeddings.txt",
                                          300)
         self.CV()
         self.test_model()

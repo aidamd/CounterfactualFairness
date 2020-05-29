@@ -61,17 +61,20 @@ def tokens_to_ids(corpus, vocab):
     return corpus
 
 
-def load_embedding(vocabulary, file_path, embedding_size):
+def load_embedding(vocabulary, embedding_size):
+    try:
+        f = open("Data/humility_embeddings.txt", "r")
+    except Exception:
+        f = open("/home/aida/Data/word_embeddings/GloVe/glove.840B.300d.txt", "r")
     embeddings = np.random.randn(len(vocabulary), embedding_size)
     found = 0
-    with open(file_path, "r") as f:
-        for line in f:
-            split = line.split()
-            idx = len(split) - embedding_size
-            vocab = "".join(split[:idx])
-            if vocab in vocabulary:
-                embeddings[vocabulary.index(vocab)] = np.array(split[idx:], dtype=np.float32)
-                found += 1
+    for line in f:
+        split = line.split()
+        idx = len(split) - embedding_size
+        vocab = "".join(split[:idx])
+        if vocab in vocabulary:
+            embeddings[vocabulary.index(vocab)] = np.array(split[idx:], dtype=np.float32)
+            found += 1
     print("Found {}/{} of vocab in word embeddings".
           format(found, len(vocabulary)))
     return embeddings
