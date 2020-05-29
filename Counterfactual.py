@@ -6,10 +6,9 @@ from random import *
 
 
 class Counterfactual():
-    def __init__(self, params, train, test, counter, asym=True):
+    def __init__(self, params, train, test, counter):
         for key in params:
             setattr(self, key, params[key])
-        self.asym = asym
         self.preprocess(train, test, counter)
         self.embeddings = load_embedding(self.vocab,
                                          "Data/humility_embeddings.txt",
@@ -47,7 +46,7 @@ class Counterfactual():
                 counter = self.asymmetrics(name, group,
                                            self.train["perplex"][name],
                                            self.train["labels"][self.train["ids"].index(name)])
-                self.counter[name] = tokens_to_ids(counter.reset_index()["text"],
+                self.counter[name] = tokens_to_ids(counter.reset_index()["text"].tolist(),
                                                    self.vocab,
                                                    )
 
@@ -95,6 +94,7 @@ class Counterfactual():
             res = prediction_results(v_labels, v_predictions)
             for m in res:
                 results.get(m, list()).append(res[m])
+        print(results)
         for m in results:
             print(m, ":", sum(results[m]) / len(results[m]))
 
@@ -140,10 +140,12 @@ class Counterfactual():
         self.embedding_init = embedding_W.assign(self.embedding_placeholder)
 
         # [batch_size, sent_length, emb_size]
-        self.X_embed = tf.nn.embedding_lookup(self.embedding_placeholder,
-                                                          self.X)
-        self.cf_embed = tf.nn.embedding_lookup(self.embedding_placeholder,
-                                                          self.cf)
+        self.X_embed = tf.nn.dropout(tf.nn.embedding_lookup(self.embedding_placeholder,
+                                                          self.X),
+                                     keep_prob=self.drop_ratio)
+        self.cf_embed = tf.nn.dropout(tf.nn.embedding_lookup(self.embedding_placeholder,
+                                                          self.cf),
+                                      keep_prob=self.drop_ratio)
 
         # encoder
 
@@ -155,13 +157,15 @@ class Counterfactual():
                                                          self.X_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
+        #self.H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
+        self.H = tf.concat(self.states, 1)
 
         _, self.counter_states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.cf_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
+        #self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
+        self.cf_H = tf.concat(self.states, 1)
 
         X_logits = tf.layers.dense(self.H, 2, name="hate")
         cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
@@ -173,7 +177,8 @@ class Counterfactual():
             weights=logit_weights
         )
         self.loss = tf.reduce_mean(xentropy)
-        self.loss += tf.reduce_mean(tf.abs(tf.subtract(X_logits, cf_logits)))
+        self.diff = tf.reduce_mean(tf.abs(tf.subtract(X_logits, cf_logits)))
+        self.loss += self.diff
         self.predicted = tf.argmax(X_logits, 1)
         self.accuracy = tf.reduce_mean(
             tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
@@ -208,10 +213,10 @@ class Counterfactual():
                 val_acc = 0
 
                 for batch in train_batches:
-                    self.feed_dict(batch)
-                    _, loss, acc = self.sess.run(
-                        [self.oprimizer, self.loss, self.accuracy],
+                    _, loss, acc, diff = self.sess.run(
+                        [self.oprimizer, self.loss, self.accuracy, self.diff],
                         feed_dict=self.feed_dict(batch))
+                    print(diff)
                     train_loss += loss
                     train_acc += acc
 
