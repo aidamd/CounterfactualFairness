@@ -5,14 +5,108 @@ from utils import *
 
 
 class Counterfactual():
-    def __init__(self, params, vocab, hate_w):
+    def __init__(self, params, train, test, counter, asym=True):
+                 #vocab, hate_w):
         for key in params:
             setattr(self, key, params[key])
-        self.vocab = vocab
+        self.asym = asym
+        self.preprocess(train, test, counter)
         self.embeddings = load_embedding(self.vocab,
-                                         "/home/aida/Data/word_embeddings/GloVe/glove.840B.300d.txt",
+                                         "Data/humility_embeddings.txt",
                                          300)
-        self.hate_weights = hate_w
+        self.CV()
+        self.test_model()
+
+    def preprocess(self, train, test, counter):
+        train = preprocess(train)
+        counter = preprocess(counter)
+        test = preprocess(test)
+
+        self.train, self.test = dict(), dict()
+
+        self.train["text"] = train["text"].values.tolist()
+        self.train["ids"] = train["Tweet ID"].values.tolist()
+        self.train["labels"] = train["hate"].values.tolist()
+        self.train["perplex"] = {self.train["ids"][i]: train["perplexity"].tolist()[i]
+                                 for i in range(train.shape[0])}
+
+        self.vocab = learn_vocab(self.train["text"], self.vocab_size)
+
+        self.train["tokens"] = tokens_to_ids(self.train["text"], self.vocab)
+
+        self.test["text"] = test["text"].values.tolist()
+        self.test["ids"] = test["Tweet ID"].values.tolist()
+        self.test["labels"] = test["hate"].values.tolist()
+        self.test["perplex"] = test["perplexity"].values.tolist()
+
+        self.test["tokens"] = tokens_to_ids(self.test["text"], self.vocab)
+
+        self.counter = dict()
+        for name, group in counter.groupby(["Tweet ID"]):
+            if name in self.train["perplex"]:
+                self.counter[name] = tokens_to_ids(self.asymmetrics(name, group,
+                                                    self.train["perplex"][name],
+                                                    self.train["labels"][self.train["ids"].index[name]]),
+                                                   self.vocab,
+                                                   )
+
+        self.hate_weights = [1 - (Counter(self.train["labels"])[i] /
+                                  len(self.train["labels"])) for i in [0, 1]]
+
+
+    def asymmetrics(self, tweet, counters, perplex, hate):
+        if self.asym:
+            diffs = [abs(perplex - counters["perplexity"].tolist()[i])
+                     for i in range(counters.shape[0])]
+            diffs.sort()
+            thresh = np.argmax([diffs[i + 1] - diffs[i] for i in range(len(diffs) - 1)])
+            return counters.loc[[i for i in range(counters.shape[0]) if
+                                 abs(perplex - counters["perplexity"].tolist()[i]) <= diffs[thresh]]]
+        else:
+            return [] if hate else counters
+
+    def CV(self):
+        kfold = StratifiedKFold(n_splits=5)
+        results = dict()
+        i = 1
+        for t_idx, v_idx in kfold.split(np.arange(len(self.train["tokens"])),
+                                        self.train["labels"]):
+            print("CV:", i)
+            i += 1
+            t_tokens, v_tokens = [self.train["tokens"][t] for t in t_idx], [self.train["tokens"][t] for t in v_idx]
+            t_index, v_index = [self.train["ids"][t] for t in t_idx], [self.train["ids"][t] for t in v_idx]
+            t_labels, v_labels = [self.train["labels"][t] for t in t_idx], [self.train["labels"][t] for t in v_idx]
+            train_batches = get_batches(t_tokens,
+                                        t_index,
+                                        self.batch_size,
+                                        self.vocab.index("<pad>"),
+                                        hate=t_labels,
+                                        counter=self.counter)
+            val_batches = get_batches(v_tokens,
+                                      v_index,
+                                      self.batch_size,
+                                      self.vocab.index("<pad>"),
+                                      hate=v_labels,
+                                      counter=self.counter)
+            self.build()
+            self.train_model(train_batches, val_batches)
+            v_predictions = self.predict(val_batches)
+            res = prediction_results(v_labels, v_predictions)
+            for m in res:
+                results.get(m, list()).append(res[m])
+        for m in results:
+            print(m, ":", sum(results[m]) / len(results[m]))
+
+    def test_model(self):
+        batches = get_batches(self.test["tokens"],
+                              self.test["ids"],
+                              self.batch_size,
+                              self.vocab.index("<pad>"))
+
+        test_predictions = self.predict(batches)
+        _ = prediction_results(self.test["labels"],
+                               test_predictions)
+
 
     def build(self):
         tf.reset_default_graph()
@@ -101,7 +195,7 @@ class Counterfactual():
             feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict
 
-    def train(self, train_batches, val_batches):
+    def train_model(self, train_batches, val_batches):
         init = tf.global_variables_initializer()
         saver = tf.train.Saver()
 

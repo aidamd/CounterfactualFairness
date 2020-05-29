@@ -4,9 +4,10 @@ import json
 from Counterfactual import *
 from sklearn.model_selection import StratifiedKFold
 
-def initialize_model(train_df, counter, params):
+def initialize_model(train_df, counter_df, params):
+    """"""
     train_df = preprocess(train_df)
-    counter_df = preprocess(counter)
+    counter_df = preprocess(counter_df)
 
     train_text = train_df["text"].values.tolist()
     train_ids = train_df["Tweet ID"].values.tolist()
@@ -15,11 +16,10 @@ def initialize_model(train_df, counter, params):
 
     train_tokens = tokens_to_ids(train_text, vocab)
     counterfactuals = dict()
-    for name, group in counter.groupby(["Tweet ID"]):
+    for name, group in counter_df.groupby(["Tweet ID"]):
         counterfactuals[name] = tokens_to_ids(group["text"].values.tolist(), vocab)
 
     hate_w = [1 - (Counter(train_df["hate"])[i] / len(train_df["hate"])) for i in [0, 1]]
-
     model = Counterfactual(params, vocab, hate_w)
 
     kfold = StratifiedKFold(n_splits=5)
@@ -87,7 +87,6 @@ if __name__ == '__main__':
         print("Wrong params file")
         exit(1)
 
-    model, vocab= initialize_model(data, counter, params)
     test = pd.read_csv(args.test)
-    test_model(test, vocab, model)
+    model = Counterfactual(params, data, test, counter)
 
