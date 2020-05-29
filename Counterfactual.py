@@ -2,6 +2,7 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split, StratifiedKFold
 import numpy as np
 from utils import *
+from random import *
 
 
 class Counterfactual():
@@ -180,17 +181,17 @@ class Counterfactual():
             .minimize(self.loss)
 
     def feed_dict(self, batch, test=False, predict=False):
-        try:
-            feed_dict = {
-                self.X: np.array([t["input"] for t in batch]),
-                self.cf: np.vstack([t["counter"][0] for t in batch]),
-                self.X_len: np.array([t["length"] for t in batch]),
-                self.drop_ratio: 1 if test else self.drop_rate,
-                self.embedding_placeholder: self.embeddings,
-                self.weights: np.array(self.hate_weights)
-                }
-        except Exception:
-            print([len(t["counter"][0]) for t in batch])
+        feed_dict = {
+            self.X: np.array([t["input"] for t in batch]),
+            self.cf: np.vstack([t["counter"][randrange(len(t["counter"]) - 1)]
+                                if len(t["counter"]) > 1 else t["counter"][0]
+                                for t in batch]),
+            self.X_len: np.array([t["length"] for t in batch]),
+            self.drop_ratio: 1 if test else self.drop_rate,
+            self.embedding_placeholder: self.embeddings,
+            self.weights: np.array(self.hate_weights)
+            }
+
         if not predict:
             feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict

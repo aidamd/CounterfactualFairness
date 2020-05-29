@@ -23,7 +23,7 @@ def remove_empty(corpus, col):
     for i, row in corpus.iterrows():
         if row[col] == "" or len(row[col]) < 4 or len(row[col]) > 100:
             drop.append(i)
-    return corpus.dropna().drop(drop)
+    return corpus.drop(drop)
 
 def clean(sent):
     http = re.sub("https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=/]{2,256}"
