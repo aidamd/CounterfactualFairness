@@ -254,8 +254,6 @@ class Counterfactual():
                     saver.save(self.sess, os.path.join(self.model_path, "counter"))
                     break
 
-    def test_model(self, test):
-
 
     def predict(self, batches):
         saver = tf.train.Saver()
