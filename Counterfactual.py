@@ -213,7 +213,6 @@ class Counterfactual():
             self.weights: np.array(self.hate_weights),
             self.cf_idx: np.array([i for i, t in enumerate(batch) if len(t["counter"]) > 1])
             }
-
         if not predict:
             feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict
@@ -230,10 +229,9 @@ class Counterfactual():
                 val_acc = 0
 
                 for batch in train_batches:
-                    _, loss, acc, diff = self.sess.run(
-                        [self.oprimizer, self.loss, self.accuracy, self.diff],
+                    _, loss, acc = self.sess.run(
+                        [self.oprimizer, self.loss, self.accuracy],
                         feed_dict=self.feed_dict(batch))
-                    print(diff)
                     train_loss += loss
                     train_acc += acc
 
@@ -261,7 +259,7 @@ class Counterfactual():
             saver.restore(self.sess, os.path.join(self.model_path, "counter"))
             for batch in batches:
                 pred, logit = self.sess.run(
-                    self.predicted,
+                    [self.predicted, self.X_logits],
                     feed_dict=self.feed_dict(batch, True, True))
                 outputs["prediction"].extend(list(pred))
                 outputs["logits"].extend(list(logit))
