@@ -24,12 +24,9 @@ class Counterfactual():
         self.embeddings = load_embedding(self.vocab, 300)
 
 
-
-
     def preprocess_train(self, train, counter):
         train = preprocess(train)
         counter = preprocess(counter)
-
 
         self.train, self.test = dict(), dict()
 
@@ -136,6 +133,9 @@ class Counterfactual():
         self.cf = tf.placeholder(tf.int32,
                                 [None, None],
                                 name="counterfactuals")
+        self.cf_idx = tf.placeholder(tf.int32,
+                                    [None],
+                                    name="sequence_len")
 
         # Counterfactuals have the same length as the sentence
         # so we don't need to redefine it
@@ -191,9 +191,10 @@ class Counterfactual():
             logits=self.X_logits,
             weights=logit_weights
         )
+
         self.loss = tf.reduce_mean(xentropy)
-        self.diff = tf.reduce_mean(tf.abs(tf.subtract(self.X_logits, self.cf_logits)))
-        self.loss += self.diff
+        self.diff = tf.gather(tf.abs(tf.subtract(self.X_logits, self.cf_logits)), self.cf_idx)
+        self.loss += tf.reduce_mean(self.diff)
         self.predicted = tf.argmax(self.X_logits, 1)
         self.accuracy = tf.reduce_mean(
             tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
@@ -209,7 +210,8 @@ class Counterfactual():
             self.X_len: np.array([t["length"] for t in batch]),
             self.drop_ratio: 1 if test else self.drop_rate,
             self.embedding_placeholder: self.embeddings,
-            self.weights: np.array(self.hate_weights)
+            self.weights: np.array(self.hate_weights),
+            self.cf_idx: np.array([i for i, t in enumerate(batch) if len(t["counter"]) > 1])
             }
 
         if not predict:
@@ -228,15 +230,10 @@ class Counterfactual():
                 val_acc = 0
 
                 for batch in train_batches:
-                    _, loss, acc, diff1 = self.sess.run(
-                        [self.oprimizer, self.loss, self.accuracy, self.diff1],
+                    _, loss, acc, diff = self.sess.run(
+                        [self.oprimizer, self.loss, self.accuracy, self.diff],
                         feed_dict=self.feed_dict(batch))
-                    if sum([len([t["counter"] for t in batch])]) != len(batch):
-                        H, cf_H, log, cf_log = self.sess.run(
-                            [self.H, self.cf_H, self.X_logits, self.cf_logits],
-                            feed_dict=self.feed_dict(batch))
-                        print()
-                    print(diff1)
+                    print(diff)
                     train_loss += loss
                     train_acc += acc
 
