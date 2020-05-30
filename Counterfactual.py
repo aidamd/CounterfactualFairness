@@ -100,7 +100,7 @@ class Counterfactual():
                                       counter=self.counter)
             self.build()
             self.train_model(train_batches, val_batches)
-            v_predictions = self.predict(val_batches)
+            v_predictions = self.predict(val_batches)["prediction"]
             res = prediction_results(v_labels, v_predictions)
             for m in res:
                 results[m].append(res[m])
