@@ -74,7 +74,7 @@ class Counterfactual():
             return [] if hate else counters
 
     def CV(self):
-        kfold = StratifiedKFold(n_splits=5)
+        kfold = StratifiedKFold(n_splits=10)
         results = {"F1 score": list(),
                    "Precision": list(),
                    "Recall": list()}
