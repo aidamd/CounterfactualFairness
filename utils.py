@@ -110,9 +110,9 @@ def batch_to_info(batch, hate, idx, pad_idx, cf):
     return batch_info
 
 def prediction_results(y, pred, label="hate"):
-    results = {"F1 score:": f1_score(y, pred),
-            "Precision:": precision_score(y, pred),
-            "Recall:": recall_score(y, pred)
+    results = {"F1 score": f1_score(y, pred),
+            "Precision": precision_score(y, pred),
+            "Recall": recall_score(y, pred)
                 }
     print(results)
     return results

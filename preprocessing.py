@@ -132,6 +132,10 @@ class Preprocessing():
             "new_sgt": list(),
             "perplexity": list()
         }
+        result_path = os.path.join(self.result_dir, "Counterfactuals_" + filename.split("/")[-1])
+
+        print("saving counterfactuals to", result_path)
+        pd.DataFrame(results).to_csv(result_path, index=False)
 
         for index, row in tqdm(dataset.iterrows()):
             text = row.text.lower()
@@ -145,12 +149,25 @@ class Preprocessing():
                     new_text = re.sub("((^|[^\w])(%s)([^\w]|$|s))" % from_sgt, " "+to_sgt+" ", text)
                     sentences.append(new_text)
                     results["text"].append(new_text)
+            try:
+                results["perplexity"].extend(self.get_perplexity(sentences, chosen_batch_size=16))
 
-            results["perplexity"].extend(self.get_perplexity(sentences))
+            except Exception:
+                results["perplexity"].extend(self.get_perplexity(sentences, chosen_batch_size=4))
 
-        result_path = os.path.join(self.result_dir, "Counterfactuals_" + filename.split("/")[-1])
-        pd.DataFrame.from_dict(results).to_csv(result_path, index=False)
-        print("saving counterfactuals to", result_path)
+            if index % 100 == 99:
+                pd.DataFrame.from_dict(results).to_csv(result_path, index=False, header=False, mode="a")
+
+                results = {
+                    "text": list(),
+                    "id": list(),
+                    "original_sgt": list(),
+                    "new_sgt": list(),
+                    "perplexity": list()
+                }
+
+        pd.DataFrame.from_dict(results).to_csv(result_path, index=False, header=False, mode="a")
+
 
     def chunk(self, filepath, num_of_rows_per_chunk=2000):
         filename = filepath.split("/")[-1]

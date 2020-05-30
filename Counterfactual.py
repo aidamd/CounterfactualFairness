@@ -1,24 +1,35 @@
 import tensorflow as tf
 from sklearn.model_selection import train_test_split, StratifiedKFold
-import numpy as np
+import pandas as pd
 from utils import *
 from random import *
+import pickle
+import os
 
 
 class Counterfactual():
-    def __init__(self, params, train, test, counter):
+    def __init__(self, params, train="", counter="",
+                 model_path="saved_model/"):
         for key in params:
             setattr(self, key, params[key])
-        self.preprocess(train, test, counter)
-        self.embeddings = load_embedding(self.vocab,
-                                         300)
-        self.CV()
-        self.test_model()
 
-    def preprocess(self, train, test, counter):
+        self.model_path = model_path
+
+        if isinstance(train, str): # either build the instance based on a saved model
+            self.vocab = pickle.load(open(os.path.join(model_path, "vocab.pkl"), "rb"))
+        else: # or make a new class with given train data
+            self.preprocess_train(train, counter)
+            pickle.dump(self.vocab, open(os.path.join(model_path, "vocab.pkl"), "wb"))
+
+        self.embeddings = load_embedding(self.vocab, 300)
+
+
+
+
+    def preprocess_train(self, train, counter):
         train = preprocess(train)
         counter = preprocess(counter)
-        test = preprocess(test)
+
 
         self.train, self.test = dict(), dict()
 
@@ -32,13 +43,6 @@ class Counterfactual():
 
         self.train["tokens"] = tokens_to_ids(self.train["text"], self.vocab)
 
-        self.test["text"] = test["text"].values.tolist()
-        self.test["ids"] = test["Tweet ID"].values.tolist()
-        self.test["labels"] = test["hate"].values.tolist()
-        self.test["perplex"] = test["perplexity"].values.tolist()
-
-        self.test["tokens"] = tokens_to_ids(self.test["text"], self.vocab)
-
         self.counter = dict()
         for name, group in counter.groupby(["Tweet ID"]):
             if name in self.train["perplex"]:
@@ -50,6 +54,15 @@ class Counterfactual():
                                                    )
 
         self.hate_weights = [1, 5]
+
+    def preprocess_test(self, test):
+        test = preprocess(test)
+        self.test["text"] = test["text"].values.tolist()
+        #self.test["ids"] = test["Tweet ID"].values.tolist()
+        #self.test["labels"] = test["hate"].values.tolist()
+        #self.test["perplex"] = test["perplexity"].values.tolist()
+        self.test["tokens"] = tokens_to_ids(self.test["text"], self.vocab)
+        return test
 
 
     def asymmetrics(self, tweet, counters, perplex, hate):
@@ -65,7 +78,9 @@ class Counterfactual():
 
     def CV(self):
         kfold = StratifiedKFold(n_splits=5)
-        results = dict()
+        results = {"F1 score": list(),
+                   "Precision": list(),
+                   "Recall": list()}
         i = 1
         for t_idx, v_idx in kfold.split(np.arange(len(self.train["tokens"])),
                                         self.train["labels"]):
@@ -91,12 +106,13 @@ class Counterfactual():
             v_predictions = self.predict(val_batches)
             res = prediction_results(v_labels, v_predictions)
             for m in res:
-                results.get(m, list()).append(res[m])
-        print(results)
+                results[m].append(res[m])
+        print("Overall performance:")
         for m in results:
             print(m, ":", sum(results[m]) / len(results[m]))
 
-    def test_model(self):
+    def test_model(self, test):
+        test = self.preprocess_test(test)
         batches = get_batches(self.test["tokens"],
                               self.test["ids"],
                               self.batch_size,
@@ -104,8 +120,10 @@ class Counterfactual():
 
         test_predictions = self.predict(batches)
         _ = prediction_results(self.test["labels"],
-                               test_predictions)
-
+                               test_predictions["prediction"])
+        test["hate"] = pd.Series(test_predictions["prediction"])
+        test["logit"] = pd.Series(test_predictions["logit"])
+        return test_predictions
 
     def build(self):
         tf.reset_default_graph()
@@ -144,7 +162,6 @@ class Counterfactual():
         self.cf_embed = tf.nn.dropout(tf.nn.embedding_lookup(self.embedding_placeholder,
                                                           self.cf),
                                       keep_prob=self.drop_ratio)
-
         # encoder
 
         fw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="ForwardRNNCell",
@@ -163,21 +180,21 @@ class Counterfactual():
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
         #self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
-        self.cf_H = tf.concat(self.states, 1)
+        self.cf_H = tf.concat(self.counter_states, 1)
 
-        X_logits = tf.layers.dense(self.H, 2, name="hate")
-        cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
+        self.X_logits = tf.layers.dense(self.H, 2, name="hate")
+        self.cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
         logit_weights = tf.gather(self.weights, self.y_hate)
 
         xentropy = tf.losses.sparse_softmax_cross_entropy(
             labels=self.y_hate,
-            logits=X_logits,
+            logits=self.X_logits,
             weights=logit_weights
         )
         self.loss = tf.reduce_mean(xentropy)
-        self.diff = tf.reduce_mean(tf.abs(tf.subtract(X_logits, cf_logits)))
+        self.diff = tf.reduce_mean(tf.abs(tf.subtract(self.X_logits, self.cf_logits)))
         self.loss += self.diff
-        self.predicted = tf.argmax(X_logits, 1)
+        self.predicted = tf.argmax(self.X_logits, 1)
         self.accuracy = tf.reduce_mean(
             tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
         self.oprimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate) \
@@ -211,10 +228,15 @@ class Counterfactual():
                 val_acc = 0
 
                 for batch in train_batches:
-                    _, loss, acc, diff = self.sess.run(
-                        [self.oprimizer, self.loss, self.accuracy, self.diff],
+                    _, loss, acc, diff1 = self.sess.run(
+                        [self.oprimizer, self.loss, self.accuracy, self.diff1],
                         feed_dict=self.feed_dict(batch))
-                    print(diff)
+                    if sum([len([t["counter"] for t in batch])]) != len(batch):
+                        H, cf_H, log, cf_log = self.sess.run(
+                            [self.H, self.cf_H, self.X_logits, self.cf_logits],
+                            feed_dict=self.feed_dict(batch))
+                        print()
+                    print(diff1)
                     train_loss += loss
                     train_acc += acc
 
@@ -229,17 +251,23 @@ class Counterfactual():
                            val_acc / len(val_batches)))
                 epoch += 1
                 if epoch == self.epochs:
-                    saver.save(self.sess, "saved_model/counter")
+                    saver.save(self.sess, os.path.join(self.model_path, "counter"))
                     break
+
+    def test_model(self, test):
 
 
     def predict(self, batches):
         saver = tf.train.Saver()
-        predicted = list()
+        outputs = {"prediction": list(),
+                   "logits": list()}
+
         with tf.Session() as self.sess:
-            saver.restore(self.sess, "saved_model/counter")
+            saver.restore(self.sess, os.path.join(self.model_path, "counter"))
             for batch in batches:
-                predicted.extend(list(self.sess.run(
+                pred, logit = self.sess.run(
                     self.predicted,
-                    feed_dict=self.feed_dict(batch, True, True))))
-        return predicted
+                    feed_dict=self.feed_dict(batch, True, True))
+                outputs["prediction"].extend(list(pred))
+                outputs["logits"].extend(list(logit))
+        return outputs
