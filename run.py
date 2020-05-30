@@ -19,7 +19,7 @@ if __name__ == '__main__':
         print("Wrong params file")
         exit(1)
 
-    test = pd.read_csv(args.test)
+    #test = pd.read_csv(args.test)
     model = Counterfactual(params, data, counter)
     model.CV()
 
