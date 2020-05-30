@@ -9,7 +9,6 @@ if __name__ == '__main__':
     parser.add_argument("--data", help="Path to data; includes text, hate and offensive columns")
     parser.add_argument("--counter", help="Path to counterfactuals")
     parser.add_argument("--params", help="Parameter files. should be a json file")
-    parser.add_argument("--test",)
 
     args = parser.parse_args()
     data = pd.read_csv(args.data)
@@ -21,7 +20,6 @@ if __name__ == '__main__':
         exit(1)
 
     test = pd.read_csv(args.test)
-    model = Counterfactual(params, data, test, counter)
+    model = Counterfactual(params, data, counter)
     model.CV()
-    model.test_model()
 
