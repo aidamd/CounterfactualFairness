@@ -156,12 +156,11 @@ class Counterfactual():
         self.embedding_init = embedding_W.assign(self.embedding_placeholder)
 
         # [batch_size, sent_length, emb_size]
-        self.X_embed = tf.nn.dropout(tf.nn.embedding_lookup(self.embedding_placeholder,
-                                                          self.X),
-                                     keep_prob=self.drop_ratio)
-        self.cf_embed = tf.nn.dropout(tf.nn.embedding_lookup(self.embedding_placeholder,
-                                                          self.cf),
-                                      keep_prob=self.drop_ratio)
+        self.X_embed = tf.nn.embedding_lookup(self.embedding_placeholder,
+                                                          self.X)
+        self.cf_embed = tf.nn.embedding_lookup(self.embedding_placeholder,
+                                                          self.cf)
+
         # encoder
 
         fw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="ForwardRNNCell",
@@ -172,15 +171,15 @@ class Counterfactual():
                                                          self.X_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        #self.H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
-        self.H = tf.concat(self.states, 1)
+        
+        self.H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
 
         _, self.counter_states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.cf_embed,
                                                          dtype=tf.float32,
                                                          sequence_length=self.X_len)
-        #self.cf_H = tf.nn.dropout(tf.concat(self.states, 1), keep_prob=self.drop_ratio)
-        self.cf_H = tf.concat(self.counter_states, 1)
+
+        self.cf_H = tf.nn.dropout(tf.concat(self.counter_states, 1), keep_prob=self.drop_ratio)
 
         self.X_logits = tf.layers.dense(self.H, 2, name="hate")
         self.cf_logits = tf.layers.dense(self.cf_H, 2, name="hate", reuse=True)
