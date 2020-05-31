@@ -5,7 +5,7 @@ from utils import *
 from random import *
 import pickle
 import os
-
+from collections import Counter
 
 class Counterfactual():
     def __init__(self, params, train="", counter="",
@@ -13,16 +13,19 @@ class Counterfactual():
         for key in params:
             setattr(self, key, params[key])
 
-        self.model_path = model_path
+        self.path = model_path
 
         if isinstance(train, str): # either build the instance based on a saved model
             self.vocab = pickle.load(open(os.path.join(model_path, "vocab.pkl"), "rb"))
         else: # or make a new class with given train data
             self.preprocess_train(train, counter)
             pickle.dump(self.vocab, open(os.path.join(model_path, "vocab.pkl"), "wb"))
-
+        
         self.embeddings = load_embedding(self.vocab, 300)
-
+        if self.asym:
+            self.model_path = os.path.join(self.path, "asym")
+        else:
+            self.model_path = os.path.join(self.path, "counter")
 
     def preprocess_train(self, train, counter):
         train = preprocess(train)
@@ -46,11 +49,15 @@ class Counterfactual():
                 counter = self.asymmetrics(name, group,
                                            self.train["perplex"][name],
                                            self.train["labels"][self.train["ids"].index(name)])
-                self.counter[name] = tokens_to_ids(counter.reset_index()["text"].tolist(),
+                if counter:
+                    self.counter[name] = tokens_to_ids(counter.reset_index()["text"].tolist(),
                                                    self.vocab,
                                                    )
 
-        self.hate_weights = [1, 5]
+        self.hate_weights = [1 - Counter(self.train["labels"])[i] / len(self.train["labels"]) 
+                for i in [0, 1]]
+        #self.hate_weights = [1, 5]
+        print(self.hate_weights)
 
     def preprocess_test(self, test):
         test = preprocess(test)
@@ -71,10 +78,10 @@ class Counterfactual():
             return counters.iloc[[i for i in range(counters.shape[0]) if
                                  abs(perplex - counters["perplexity"].tolist()[i]) <= diffs[thresh]]]
         else:
-            return [] if hate else counters
+            return []# if hate else counters
 
     def CV(self):
-        kfold = StratifiedKFold(n_splits=10)
+        kfold = StratifiedKFold(n_splits=5, shuffle=True)
         results = {"F1 score": list(),
                    "Precision": list(),
                    "Recall": list()}
@@ -163,10 +170,15 @@ class Counterfactual():
 
         # encoder
 
-        fw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="ForwardRNNCell",
-                                          state_is_tuple=False)
-        bw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="BackwardRNNCell",
-                                          state_is_tuple=False, reuse=False)
+        #fw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="ForwardRNNCell",
+        #                                  state_is_tuple=False)
+        #bw_cell = tf.nn.rnn_cell.LSTMCell(num_units=self.h_size, name="BackwardRNNCell",
+        #                                  state_is_tuple=False, reuse=False)
+        fw_cell = tf.nn.rnn_cell.GRUCell(num_units=self.h_size,
+                          name="ForwardRNNCell")
+        bw_cell = tf.nn.rnn_cell.GRUCell(num_units=self.h_size,
+                          reuse=False, name="BackwardRNNCell")
+        
         _, self.states = tf.nn.bidirectional_dynamic_rnn(fw_cell, bw_cell,
                                                          self.X_embed,
                                                          dtype=tf.float32,
@@ -193,7 +205,8 @@ class Counterfactual():
 
         self.loss = tf.reduce_mean(xentropy)
         self.diff = tf.gather(tf.abs(tf.subtract(self.X_logits, self.cf_logits)), self.cf_idx)
-        self.loss += tf.reduce_mean(self.diff)
+        if self.asym:
+            self.loss += tf.reduce_mean(self.diff)
         self.predicted = tf.argmax(self.X_logits, 1)
         self.accuracy = tf.reduce_mean(
             tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
@@ -245,7 +258,7 @@ class Counterfactual():
                            val_acc / len(val_batches)))
                 epoch += 1
                 if epoch == self.epochs:
-                    saver.save(self.sess, os.path.join(self.model_path, "counter"))
+                    saver.save(self.sess, self.model_path)
                     break
 
 
@@ -255,7 +268,7 @@ class Counterfactual():
                    "logits": list()}
 
         with tf.Session() as self.sess:
-            saver.restore(self.sess, os.path.join(self.model_path, "counter"))
+            saver.restore(self.sess, self.model_path)
             for batch in batches:
                 pred, logit = self.sess.run(
                     [self.predicted, self.X_logits],
