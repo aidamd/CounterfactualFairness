@@ -22,10 +22,9 @@ class Counterfactual():
             pickle.dump(self.vocab, open(os.path.join(model_path, "vocab.pkl"), "wb"))
         
         self.embeddings = load_embedding(self.vocab, 300)
-        if self.asym:
-            self.model_path = os.path.join(self.path, "asym")
-        else:
-            self.model_path = os.path.join(self.path, "counter")
+        
+        self.model_path = os.path.join(self.path, self.type, self.type)
+        
 
     def preprocess_train(self, train, counter):
         train = preprocess(train)
@@ -39,7 +38,7 @@ class Counterfactual():
         self.train["perplex"] = {self.train["ids"][i]: train["perplexity"].tolist()[i]
                                  for i in range(train.shape[0])}
 
-        self.vocab = learn_vocab(self.train["text"], self.vocab_size)
+        self.vocab = learn_vocab(self.train["text"], self.vocab_size, "mask" in self.type)
 
         self.train["tokens"] = tokens_to_ids(self.train["text"], self.vocab)
 
@@ -49,7 +48,7 @@ class Counterfactual():
                 counter = self.asymmetrics(name, group,
                                            self.train["perplex"][name],
                                            self.train["labels"][self.train["ids"].index(name)])
-                if counter:
+                if not isinstance(counter, str):
                     self.counter[name] = tokens_to_ids(counter.reset_index()["text"].tolist(),
                                                    self.vocab,
                                                    )
@@ -70,15 +69,17 @@ class Counterfactual():
 
 
     def asymmetrics(self, tweet, counters, perplex, hate):
-        if self.asym:
+        if "asym" in self.type:
             diffs = [abs(perplex - counters["perplexity"].tolist()[i])
                      for i in range(counters.shape[0])]
             diffs.sort()
             thresh = np.argmax([diffs[i + 1] - diffs[i] for i in range(len(diffs) - 1)])
             return counters.iloc[[i for i in range(counters.shape[0]) if
                                  abs(perplex - counters["perplexity"].tolist()[i]) <= diffs[thresh]]]
+        elif "clp" in self.type:
+            return "" if hate else counters
         else:
-            return []# if hate else counters
+            return ""
 
     def CV(self):
         kfold = StratifiedKFold(n_splits=5, shuffle=True)
@@ -205,7 +206,7 @@ class Counterfactual():
 
         self.loss = tf.reduce_mean(xentropy)
         self.diff = tf.gather(tf.abs(tf.subtract(self.X_logits, self.cf_logits)), self.cf_idx)
-        if self.asym:
+        if "clp" in self.type:
             self.loss += tf.reduce_mean(self.diff)
         self.predicted = tf.argmax(self.X_logits, 1)
         self.accuracy = tf.reduce_mean(

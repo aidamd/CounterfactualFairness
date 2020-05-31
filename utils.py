@@ -30,7 +30,7 @@ def clean(sent):
                   "\.[a-z]{2,4}([-a-zA-Z0-9@:%_\+.~#?&//=]*)", "", sent)
     return re.sub(r'[^a-zA-Z ]', r'', http.lower())
 
-def learn_vocab(corpus, vocab_size):
+def learn_vocab(corpus, vocab_size, mask=False):
     print("Learning vocabulary of size %d" % (vocab_size))
     tokens = dict()
     for sent in corpus:
@@ -40,7 +40,15 @@ def learn_vocab(corpus, vocab_size):
             else:
                 tokens[token] = 1
     words, counts = zip(*sorted(tokens.items(), key=operator.itemgetter(1), reverse=True))
-    return list(words[:vocab_size]) + ["<unk>", "<pad>"]
+    vocab = list(words[:vocab_size]) + ["<unk>", "<pad>"]
+    if mask:
+        print("vocab size", len(vocab))
+        sgts = [sgt.replace("\n", "") for sgt in open("Data/extended_SGT.txt", "r").readlines()]
+        for sgt in sgts:
+            if sgt in vocab:
+                vocab.remove(sgt)
+        print("after removing sgts", len(vocab))
+    return vocab
 
 
 def tokens_to_ids(corpus, vocab):
