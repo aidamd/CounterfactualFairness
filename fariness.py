@@ -8,7 +8,7 @@ import statistics
 def clean(val):
     vec = [float(x) for x in val.replace("[", "").replace("]", "").rstrip().lstrip().split()]
     sum_exp = sum(math.exp(x) for x in vec)
-    vex = [math.exp(x) / sum_exp for x in vec]
+    vex = [100 * math.exp(x) / sum_exp for x in vec]
     return  vex
 
 
@@ -25,16 +25,16 @@ def fair(path):
             if file == "stereo":
                 main_logit = [clean(str(row["logits"]))[1] for i, row in group.iterrows() if row["orig_sgt"] == True][0]
                 logits.remove(main_logit)
-                print(file, statistics.variance(logits, main_logit))
+                diffs.append(statistics.variance(logits, main_logit))
             else:
                 #main_logit = logits[random.randrange(len(logits))]
                 #logits.remove(main_logit)
-                print(file, statistics.variance(logits, main_logit))
+                diffs.append(statistics.variance(logits))
 
             #logits = [abs(log - main_logit) for log in logits]
             #diffs.append(sum(logits) / len(logits))
 
-        #print(file, sum(diffs) / len(diffs))
+        print(file, sum(diffs) / len(diffs))
 
 def tp(path):
     test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
