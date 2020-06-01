@@ -21,7 +21,7 @@ def synth():
             for i, row in group.iterrows():
                 new_df["group"].append(row.Text.split()[3])
                 new_df["text"].append(row.Text)
-    pd.DataFrame.from_dict(new_df).to_csv("Data/bias_context.csv", index=False)
+    pd.DataFrame.from_dict(new_df).to_csv("Data/bias_context.csv")
 
 
 def stereo():
@@ -56,7 +56,7 @@ def stereo():
             counter_df["group"].append(i)
             counter_df["orig_sgt"].append(new_df["sgt"][i] == sgt)
 
-    pd.DataFrame.from_dict(counter_df).to_csv("Data/stereo_context.csv", index=False)
+    pd.DataFrame.from_dict(counter_df).to_csv("Data/stereo_context.csv")
 
 def eval_logits(test_path):
     df = pd.read_csv(test_path)
@@ -80,4 +80,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     eval_test(args.data, args.params)
+
 

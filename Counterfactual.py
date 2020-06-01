@@ -63,7 +63,7 @@ class Counterfactual():
         self.test = dict()
         self.test["text"] = test["text"].values.tolist()
         self.test["ids"] = test["Tweet ID"].values.tolist()
-        self.test["labels"] = test["hate"].values.tolist()
+        #self.test["labels"] = test["hate"].values.tolist() if "hate"
         #self.test["perplex"] = test["perplexity"].values.tolist()
         self.test["tokens"] = tokens_to_ids(self.test["text"], self.vocab)
         return test
@@ -135,7 +135,8 @@ class Counterfactual():
                               self.vocab.index("<pad>"))
 
         test_predictions = self.predict(batches)
-        _ = prediction_results(self.test["labels"],
+        if "hate" in test.columns.tolist():
+            _ = prediction_results(test["hate"].values.tolist(),
                                test_predictions["prediction"])
         test["hate"] = pd.Series(test_predictions["prediction"])
         test["logits"] = pd.Series(test_predictions["logits"])
@@ -275,7 +276,7 @@ class Counterfactual():
                     break
 
 
-    def predict(self, batches):
+    def predict(self, batches, ):
         saver = tf.train.Saver()
         outputs = {"prediction": list(),
                    "logits": list()}
