@@ -28,9 +28,12 @@ def fair(path):
 
             logits = [clean(str(row["logits"]))[1] for i, row in group.iterrows()]
             if file == "stereo":
-                main_logit = [clean(str(row["logits"]))[1] for i, row in group.iterrows() if row["orig_sgt"] == True][0]
-                logits.remove(main_logit)
-                diffs.append(statistics.variance(logits, main_logit))
+                try:
+                    main_logit = [clean(str(row["logits"]))[1] for i, row in group.iterrows() if row["orig_sgt"] == True][0]
+                    logits.remove(main_logit)
+                    diffs.append(statistics.variance(logits, main_logit))
+                except Exception:
+                    continue
             else:
                 #main_logit = logits[random.randrange(len(logits))]
                 #logits.remove(main_logit)
