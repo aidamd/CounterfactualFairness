@@ -64,8 +64,8 @@ def eval_logits(test_path):
 
 def eval_test(test_path, param_file):
     params = json.load(open(param_file, 'r'))
-    model = Counterfactual(params)
     test = pd.read_csv(test_path)
+    model = Counterfactual(params)
 
     test = model.test_model(test)
     test.to_csv(os.path.join("saved_model/", params["type"], test_path.split("/")[-1].split(".")[0] + "_predict.csv")
@@ -73,7 +73,6 @@ def eval_test(test_path, param_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", help="Path to data; includes text, hate and offensive columns")
     parser.add_argument("--params")
 
     args = parser.parse_args()

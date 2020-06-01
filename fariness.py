@@ -29,8 +29,18 @@ def fair(path):
 
 def tp(path):
     test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
-
-
+    tp, tn = 0, 0
+    n, p = 0, 0
+    for i, row in test.iterrows():
+        if row["single_sgt"] != "":
+            p += row["predict"]
+            n += 1 - row["predict"]
+            if row["predict"] + row["hate"] == 2:
+                tp += 1
+            if row["predict"] + row["hate"] == 0:
+                tn += 1
+    print("true positive", tp / p)
+    print("true negative", tn / n)
 
 
 if __name__ == "__main__":
