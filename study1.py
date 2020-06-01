@@ -65,6 +65,42 @@ def counterfactuals():
             p.generate_counterfactuals(current_chunk)
 	except Exception:
             continue
-        
+     
+
+def rank_original_post(beginning_idex, end_index):
+	print("working on", beginning_index, "to", end_index - 1)
+	result_path = "dump/Ranking_Chunks_" + str(beginning_index)+"_to_"+ str(end_index-1) + ".csv"
+
+	row_list = []
+	for i in range(beginning_index, end_index):
+	    counter = "dump/Counterfactuals_Chunk_" + str(i) + "_Populated_All.csv"
+	    print("Processing", counter)
+	    try:
+		counter_data = pd.read_csv(counter)
+	    except Exception:
+		print("bad file!", counter)
+		continue
+
+	    for name, group in counter_data.groupby(["id"]):
+		# id, text, original_SGT, rank
+		record = dict()
+		record["id"] = name
+		original_record = group.loc[group['original_sgt'] == group['new_sgt']]
+		try:
+		    record["text"] = original_record["text"].values[0]
+		    record["original_SGT"] = original_record["original_sgt"].values[0]
+		    original_perplexity = original_record["perplexity"].values[0]
+		except Exception:
+		    print("faulty record!  id=", name)
+		    print(original_record)
+		    continue
+		perplexities = [group["perplexity"].tolist()[i] for i in range(group.shape[0])]
+		perplexities.sort()
+		record["rank"] = perplexities.index(original_perplexity)+1
+		row_list.append(record)
+
+	perplexity_rank_df = pd.DataFrame(row_list)   
+	print("saving to", result_path)
+	perplexity_rank_df.to_csv(result_path, index=False, encoding='utf-8-sig')
 
 counterfactuals()
