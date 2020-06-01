@@ -266,10 +266,11 @@ class Counterfactual():
                         feed_dict=self.feed_dict(batch, True))
                     val_acc += acc
 
-                print("Epoch: %d, loss: %.4f, train: %.4f, test: %.4f" %
-                          (epoch, train_loss / len(train_batches),
-                           train_acc / len(train_batches),
-                           val_acc / len(val_batches)))
+                if val_batches:
+                    print("Epoch: %d, loss: %.4f, train: %.4f, test: %.4f" %
+                              (epoch, train_loss / len(train_batches),
+                               train_acc / len(train_batches),
+                               val_acc / len(val_batches)))
                 epoch += 1
                 if epoch == self.epochs:
                     saver.save(self.sess, self.model_path)

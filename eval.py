@@ -71,8 +71,6 @@ def eval_test(test_path, param_file):
     test.to_csv(os.path.join("saved_model/", params["type"], test_path.split("/")[-1].split(".")[0] + "_predict.csv")
                 , index=False)
 
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", help="Path to data; includes text, hate and offensive columns")
