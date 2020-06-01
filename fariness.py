@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import random
+import argparse
 
 def clean(val):
     return [float(x) for x in val.replace("[", "").replace("]", "").rstrip().lstrip().split()]
@@ -26,5 +27,16 @@ def fair(path):
 
         print(file, sum(diffs) / len(diffs))
 
+def tp(path):
+    test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
 
-fair("saved_model/base")
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", help="Path to data; includes text, hate and offensive columns")
+
+    args = parser.parse_args()
+    fair("saved_model/" + args.model)
+    tp("saved_model/" + args.model)

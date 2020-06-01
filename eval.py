@@ -77,6 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--params")
 
     args = parser.parse_args()
-    eval_test(args.data, args.params)
+    for data in ["Data/gab_test.csv", "Data/stereo_context.csv", "Data/bias_context.csv"]:
+        eval_test(data, args.params)
 
 

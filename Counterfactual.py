@@ -138,7 +138,7 @@ class Counterfactual():
         if "hate" in test.columns.tolist():
             _ = prediction_results(test["hate"].values.tolist(),
                                test_predictions["prediction"])
-        test["hate"] = pd.Series(test_predictions["prediction"])
+        test["predict"] = pd.Series(test_predictions["prediction"])
         test["logits"] = pd.Series(test_predictions["logits"])
         return test
 
