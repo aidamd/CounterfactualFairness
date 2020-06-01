@@ -18,6 +18,11 @@ def fair(path):
     for file in x:
         s = pd.read_csv(os.path.join(path, file + "_context_predict.csv"))
         diffs = list()
+        drop = list()
+        for i, row in s.iterrows():
+            if "5000" in row["text"]:
+                drop.append(i)
+        s = s.drop(drop)
 
         for name, group in s.groupby(["group"]):
 
