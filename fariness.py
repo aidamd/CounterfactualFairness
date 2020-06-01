@@ -2,9 +2,13 @@ import pandas as pd
 import os
 import random
 import argparse
+import math
 
 def clean(val):
-    return [float(x) for x in val.replace("[", "").replace("]", "").rstrip().lstrip().split()]
+    vec = [float(x) for x in val.replace("[", "").replace("]", "").rstrip().lstrip().split()]
+    sum_exp = sum(math.exp(x) for x in vec)
+    vex = [math.exp(x) / sum_exp for x in vec]
+    return  vex
 
 
 def fair(path):
