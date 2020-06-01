@@ -46,18 +46,21 @@ def fair(path):
 
 def tp(path):
     test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
-    tp, tn = 0, 0
-    n, p = 0, 0
+    tp, tn = dict(), dict()
+    n, p = dict(), dict()
     for i, row in test.iterrows():
         if row["single_sgt"] != "":
-            p += row["predict"]
-            n += 1 - row["predict"]
+            p[row["single_sgt"]] = p.get(row["single_sgt"], 0) + row["predict"]
+            n[row["single_sgt"]] = n.get(row["single_sgt"], 0) + 1 - row["predict"]
             if row["predict"] + row["hate"] == 2:
-                tp += 1
+                tp[row["single_sgt"]] = tp.get(row["single_sgt"], 0)  + 1
             if row["predict"] + row["hate"] == 0:
-                tn += 1
-    print("true positive", tp / p)
-    print("true negative", tn / n)
+                tn[row["single_sgt"]] = tn.get(row["single_sgt"], 0) + 1
+    tp_rate = [100 * tp[x] / p[x] for x in p.keys()]
+    tn_rate = [100 * tn[x] / n[x] for x in n.keys()]
+
+    print("true positive average", sum(tp_rate) / len(tp_rate), "variation", statistics.variance(tp_rate))
+    print("true negative average", sum(tn_rate) / len(tn_rate), "variation", statistics.variance(tn_rate))
 
 
 if __name__ == "__main__":
