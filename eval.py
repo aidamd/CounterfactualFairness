@@ -58,8 +58,8 @@ def stereo():
 
     pd.DataFrame.from_dict(counter_df).to_csv("Data/stereo_context.csv", index=False)
 
-def eval_test(test_path):
-    params = json.load(open("params.json", 'r'))
+def eval_test(test_path, param_file):
+    params = json.load(open(param_file, 'r'))
     model = Counterfactual(params)
     test = pd.read_csv(test_path)
 
@@ -70,7 +70,8 @@ def eval_test(test_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", help="Path to data; includes text, hate and offensive columns")
+    parser.add_argument("--params")
 
     args = parser.parse_args()
-    eval_test(args.data)
+    eval_test(args.data, args.params)
 
