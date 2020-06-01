@@ -68,7 +68,8 @@ def eval_test(test_path, param_file):
     test = pd.read_csv(test_path)
 
     test = model.test_model(test)
-    test.to_csv(test_path.split(".")[0] + "_predict.csv", index=False)
+    test.to_csv(os.path.join("saved_model/", params["type"], test_path.split("/")[-1].split(".")[0] + "_predict.csv")
+                , index=False)
 
 
 
