@@ -3,6 +3,7 @@ import os
 import random
 import argparse
 import math
+import statistics
 
 def clean(val):
     vec = [float(x) for x in val.replace("[", "").replace("]", "").rstrip().lstrip().split()]
@@ -23,13 +24,17 @@ def fair(path):
             logits = [clean(str(row["logits"]))[1] for i, row in group.iterrows()]
             if file == "stereo":
                 main_logit = [clean(str(row["logits"]))[1] for i, row in group.iterrows() if row["orig_sgt"] == True][0]
+                logits.remove(main_logit)
+                print(file, statistics.variance(logits, main_logit))
             else:
-                main_logit = logits[random.randrange(len(logits))]
-            logits.remove(main_logit)
-            logits = [abs(log - main_logit) for log in logits]
-            diffs.append(sum(logits) / len(logits))
+                #main_logit = logits[random.randrange(len(logits))]
+                #logits.remove(main_logit)
+                print(file, statistics.variance(logits, main_logit))
 
-        print(file, sum(diffs) / len(diffs))
+            #logits = [abs(log - main_logit) for log in logits]
+            #diffs.append(sum(logits) / len(logits))
+
+        #print(file, sum(diffs) / len(diffs))
 
 def tp(path):
     test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
