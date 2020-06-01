@@ -117,6 +117,15 @@ class Counterfactual():
         for m in results:
             print(m, ":", sum(results[m]) / len(results[m]))
 
+        train_batches = get_batches(self.train["tokens"],
+                                    self.train["ids"],
+                                    self.batch_size,
+                                    self.vocab.index("<pad>"),
+                                    hate=self.train["labels"],
+                                    counter=self.counter)
+        self.build()
+        self.train_model(train_batches, [])
+
     def test_model(self, test):
         self.build()
         test = self.preprocess_test(test)

@@ -58,6 +58,10 @@ def stereo():
 
     pd.DataFrame.from_dict(counter_df).to_csv("Data/stereo_context.csv", index=False)
 
+def eval_logits(test_path):
+    df = pd.read_csv(test_path)
+
+
 def eval_test(test_path, param_file):
     params = json.load(open(param_file, 'r'))
     model = Counterfactual(params)
@@ -65,6 +69,7 @@ def eval_test(test_path, param_file):
 
     test = model.test_model(test)
     test.to_csv(test_path.split(".")[0] + "_predict.csv", index=False)
+
 
 
 if __name__ == "__main__":
