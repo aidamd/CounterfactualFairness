@@ -60,9 +60,10 @@ class Counterfactual():
 
     def preprocess_test(self, test):
         test = preprocess(test)
+        self.test = dict()
         self.test["text"] = test["text"].values.tolist()
-        #self.test["ids"] = test["Tweet ID"].values.tolist()
-        #self.test["labels"] = test["hate"].values.tolist()
+        self.test["ids"] = test["Tweet ID"].values.tolist()
+        self.test["labels"] = test["hate"].values.tolist()
         #self.test["perplex"] = test["perplexity"].values.tolist()
         self.test["tokens"] = tokens_to_ids(self.test["text"], self.vocab)
         return test
@@ -117,6 +118,7 @@ class Counterfactual():
             print(m, ":", sum(results[m]) / len(results[m]))
 
     def test_model(self, test):
+        self.build()
         test = self.preprocess_test(test)
         batches = get_batches(self.test["tokens"],
                               self.test["ids"],
@@ -127,8 +129,8 @@ class Counterfactual():
         _ = prediction_results(self.test["labels"],
                                test_predictions["prediction"])
         test["hate"] = pd.Series(test_predictions["prediction"])
-        test["logit"] = pd.Series(test_predictions["logit"])
-        return test_predictions
+        test["logits"] = pd.Series(test_predictions["logits"])
+        return test
 
     def build(self):
         tf.reset_default_graph()
@@ -223,10 +225,11 @@ class Counterfactual():
             self.X_len: np.array([t["length"] for t in batch]),
             self.drop_ratio: 1 if test else self.drop_rate,
             self.embedding_placeholder: self.embeddings,
-            self.weights: np.array(self.hate_weights),
+            #self.weights: np.array(self.hate_weights),
             self.cf_idx: np.array([i for i, t in enumerate(batch) if len(t["counter"]) > 1])
             }
         if not predict:
+            feed_dict[self.weights] = np.array(self.hate_weights)
             feed_dict[self.y_hate] = np.array([t["hate"] for t in batch])
         return feed_dict
 
