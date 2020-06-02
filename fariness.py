@@ -12,7 +12,8 @@ def clean(val):
     return  vex
 
 def distance(a, b):
-    return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+    #return math.sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2)
+    return (abs(a[0] - b[0]) + abs(a[1] - b[1])) / 2
 
 def fair(path):
     x = ["stereo", "bias"]
