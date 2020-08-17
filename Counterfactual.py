@@ -9,7 +9,7 @@ from collections import Counter
 
 class Counterfactual():
     def __init__(self, params, train="", counter="",
-                 model_path="saved_model/"):
+                 model_path="storm_saved_model/"):
         for key in params:
             setattr(self, key, params[key])
 
@@ -52,7 +52,7 @@ class Counterfactual():
                     self.counter[name] = tokens_to_ids(counter.reset_index()["text"].tolist(),
                                                    self.vocab,
                                                    )
-
+        #exit(1)
         #self.hate_weights = [1 - Counter(self.train["labels"])[i] / len(self.train["labels"]) 
         #        for i in [0, 1]]
         self.hate_weights = [1, 5]
@@ -75,8 +75,11 @@ class Counterfactual():
                      for i in range(counters.shape[0])]
             diffs.sort()
             thresh = np.argmax([diffs[i + 1] - diffs[i] for i in range(len(diffs) - 1)])
-            return counters.iloc[[i for i in range(counters.shape[0]) if
+            counterfactuals = counters.iloc[[i for i in range(counters.shape[0]) if
                                  abs(perplex - counters["perplexity"].tolist()[i]) <= diffs[thresh]]]
+            if counterfactuals.shape[0] < 3:
+                counterfactuals.to_csv("examples.csv", index=False, mode="a")
+            return counterfactuals
         elif "clp" in self.type:
             return "" if hate else counters
         else:
@@ -129,6 +132,7 @@ class Counterfactual():
     def test_model(self, test):
         self.build()
         test = self.preprocess_test(test)
+        test = test.reset_index()
         batches = get_batches(self.test["tokens"],
                               self.test["ids"],
                               self.batch_size,
@@ -138,7 +142,9 @@ class Counterfactual():
         if "hate" in test.columns.tolist():
             _ = prediction_results(test["hate"].values.tolist(),
                                test_predictions["prediction"])
+        #print(test_predictions["prediction"])
         test["predict"] = pd.Series(test_predictions["prediction"])
+        #print(test["predict"])
         test["logits"] = pd.Series(test_predictions["logits"])
         return test
 
@@ -219,7 +225,7 @@ class Counterfactual():
         self.loss = tf.reduce_mean(xentropy)
         self.diff = tf.gather(tf.abs(tf.subtract(self.X_logits, self.cf_logits)), self.cf_idx)
         if "clp" in self.type:
-            self.loss += tf.reduce_mean(self.diff)
+            self.loss += self.factor * tf.reduce_mean(self.diff)
         self.predicted = tf.argmax(self.X_logits, 1)
         self.accuracy = tf.reduce_mean(
             tf.cast(tf.equal(self.predicted, self.y_hate), tf.float32))
@@ -281,7 +287,7 @@ class Counterfactual():
         saver = tf.train.Saver()
         outputs = {"prediction": list(),
                    "logits": list()}
-
+        print(len(batches))
         with tf.Session() as self.sess:
             saver.restore(self.sess, self.model_path)
             for batch in batches:

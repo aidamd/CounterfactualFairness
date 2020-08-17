@@ -50,11 +50,11 @@ def fair(path):
         print(file, sum(diffs) / len(diffs))
 
 def tp(path):
-    test = pd.read_csv(os.path.join(path, "gab_test_predict.csv"))
+    test = pd.read_csv(os.path.join(path, "storm_test_predict.csv"))
     tp, tn = dict(), dict()
     n, p = dict(), dict()
     for i, row in test.iterrows():
-        if row["single_sgt"] != "":
+        if isinstance(row["single_sgt"], str):
             p[row["single_sgt"]] = p.get(row["single_sgt"], 0) + row["predict"]
             n[row["single_sgt"]] = n.get(row["single_sgt"], 0) + 1 - row["predict"]
             if row["predict"] + row["hate"] == 2:
@@ -63,15 +63,17 @@ def tp(path):
                 tn[row["single_sgt"]] = tn.get(row["single_sgt"], 0) + 1
     tp_rate = [100 * tp.get(x, 0) / max(1, p[x]) for x in p.keys()]
     tn_rate = [100 * tn.get(x, 0) / max(1, n[x]) for x in n.keys()]
-
+    
+    #print(tn)
+    #print(n)
     print("true positive average", sum(tp_rate) / len(tp_rate), "variation", math.sqrt(statistics.variance(tp_rate)))
     print("true negative average", sum(tn_rate) / len(tn_rate), "variation", math.sqrt(statistics.variance(tn_rate)))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", help="Path to data; includes text, hate and offensive columns")
+    parser.add_argument("--model", help="name of the model")
 
     args = parser.parse_args()
-    fair("saved_model/" + args.model)
-    tp("saved_model/" + args.model)
+    fair("storm_saved_model/" + args.model)
+    tp("storm_saved_model/" + args.model)

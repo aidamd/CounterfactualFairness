@@ -3,6 +3,7 @@ import json
 import re
 from Counterfactual import *
 import argparse
+from collections import Counter
 
 def synth():
     df = pd.read_csv("Data/bias_77k.csv")
@@ -68,7 +69,8 @@ def eval_test(test_path, param_file):
     model = Counterfactual(params)
 
     test = model.test_model(test)
-    test.to_csv(os.path.join("saved_model/", params["type"], test_path.split("/")[-1].split(".")[0] + "_predict.csv")
+    #print(Counter(test.predict))
+    test.to_csv(os.path.join("storm_saved_model/", params["type"], test_path.split("/")[-1].split(".")[0] + "_predict.csv")
                 , index=False)
 
 if __name__ == "__main__":
@@ -76,7 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("--params")
 
     args = parser.parse_args()
-    for data in ["Data/gab_test.csv", "Data/stereo_context.csv", "Data/bias_context.csv"]:
+    for data in ["new_Data/storm_test.csv", "Data/stereo_context.csv", "Data/bias_context.csv"]:
         eval_test(data, args.params)
 
 
